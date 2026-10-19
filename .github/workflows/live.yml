@@ -26,4 +26,4 @@ jobs:
           coordinates: '[{"coordinate":"3232/3232/0"},{"coordinate":"3232/3232/1"}]'
           output-dir: second
       - name: Verify PNG delivery and repeated identity
-        run: nix develop -c python3 scripts/check-live first/manifest.json second/manifest.json
+        run: nix develop -c node scripts/check-live.mjs first/manifest.json second/manifest.json
