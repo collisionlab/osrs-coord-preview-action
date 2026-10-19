@@ -1,0 +1,43 @@
+name: Test standalone PR comment
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: PR in this repository on which to verify comment create/update
+        required: true
+      renderer_url:
+        description: Approved renderer endpoint (override during staging)
+        default: https://tiles.collisionlab.world/previews/v1/render
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Write coordinates-file fixture
+        run: echo '[{"coordinate":"3222/3218/0","label":"Initial smoke"}]' > coordinates.json
+      - name: Create comment from file input
+        uses: ./
+        with:
+          coordinates-file: coordinates.json
+          renderer-url: ${{ inputs.renderer_url }}
+          pr-number: ${{ inputs.pr_number }}
+          comment: "true"
+      - name: Update the same comment using inline precedence
+        uses: ./
+        with:
+          coordinates: '[{"coordinate":"3222/3218/0","label":"Updated smoke"}]'
+          coordinates-file: coordinates.json
+          renderer-url: ${{ inputs.renderer_url }}
+          pr-number: ${{ inputs.pr_number }}
+          comment: "true"
+      - name: Verify one updated comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate --slurp |
+            jq -e '[.[][] | select(.body | contains("<!-- osrs-coordinate-preview -->"))] |
+              length == 1 and (.[0].body | contains("Updated smoke"))'

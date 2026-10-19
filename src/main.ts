@@ -15,7 +15,7 @@ async function main() {
 
     await runAction({
       coordinatesRaw,
-      rendererUrl: getActionInput("renderer-url", "OSRS_RENDERER_URL") || "https://osrs-coordinate-preview-nt7ywvsdgq-nw.a.run.app/render",
+      rendererUrl: getActionInput("renderer-url", "OSRS_RENDERER_URL") || "https://tiles.collisionlab.world/previews/v1/render",
       outputDir: getActionInput("output-dir", "OSRS_OUTPUT_DIR") || ".osrs-coordinate-preview"
     });
   } catch (error) {
