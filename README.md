@@ -1,6 +1,6 @@
 # OSRS Coordinate Preview Action
 
-This repository contains the standalone GitHub Action client for the [CollisionLab coordinate renderer](https://github.com/collisionlab/osrs-coord-preview).
+This is the canonical published GitHub Action client for the [CollisionLab coordinate renderer](https://github.com/collisionlab/osrs-coord-preview).
 
 ## What it does
 
@@ -78,36 +78,21 @@ npm test
 
 `npm run build` compiles the TypeScript sources and bundles the published action entrypoint into `dist/index.js`.
 
-## Migration and releases
+## Checks and releases
 
-The original repository, Git history and tags are preserved. Existing `mpickering`
-revisions continue to call the old renderer. This migration keeps all inputs and
-outputs, the `osrs-coordinate-preview` comment tag and the HTML marker unchanged.
-The `pr-number` and default GitHub token handling remain in the existing composite
-comment action. No R2 or Google credentials are needed by this client.
+`nix develop -c npm test` rebuilds the self-contained bundle and runs unit and
+isolated HTTP tests. PR CI also runs `uses: ./` against a controlled renderer and
+checks the manifest, image URL, comment marker, comment body and job summary.
+No production credentials are needed. The manual PR-comment workflow verifies
+comment create/update; the `test-pr-comment` label enables that check on local PRs.
 
-The CollisionLab API is undergoing staged deployment. The new release is a
-prerelease; use the `renderer-url` override with the existing endpoint during
-acceptance testing. Do not update established consumers or move `v1` until the
-public API and real PR comment create/update checks pass.
+The `live` workflow runs on main and weekly once `PREVIEW_PUBLIC_LIVE=true` is
+set after public-route acceptance. It renders ground and upper planes, downloads
+both PNGs and verifies stable identities across repeated requests. Infra owns the
+authenticated cache-miss smoke for Cloud Run and R2.
 
-`npm test` builds the committed, self-contained `dist/index.js` bundle and runs
-unit and isolated bundle/HTTP tests. CI checks the rebuilt bundle is unchanged.
-Only `dist/index.js` and its module package metadata are published runtime
-artefacts; consumers do not install npm dependencies. The Nix flake pins Node and
-uses the same nixpkgs revision as the renderer and infrastructure repositories.
-
-Release order: review/test this client; tag a candidate `v1.5.0-rc.1`; run the external consumer
-workflow in `collisionlab/osrs-tiles` with repository
-`collisionlab/osrs-coord-preview-action` and that revision; verify the live public
-API and PR comment create/update; then publish a stable tag and deliberately move
-`v1`. Roll back consumers to their previous immutable revision if necessary. Do
-not delete old releases, the old renderer or historical image storage.
-
-Repository settings are managed by `collisionlab/infra` OpenTofu. This client
-requires no new compute, storage, deployment secrets or infrastructure service.
-
-The manual `Test standalone PR comment` workflow calls the packaged composite
-Action twice on a specified PR and checks that exactly one comment remains with
-the updated label. It exercises file input, inline precedence, `pr-number` and the
-default GitHub token. Run it against an approved renderer before stable release.
+Published runtime files are `dist/index.js` and `dist/package.json`; consumers do
+not install dependencies or receive cloud credentials. Existing released tags and
+legacy `mpickering/*` consumers remain unchanged. Publishing `v1.5.0` or moving
+`v1` requires an explicit release decision after live and PR-comment checks pass.
+Repository settings are managed by `collisionlab/infra`.

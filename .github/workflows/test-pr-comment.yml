@@ -1,5 +1,7 @@
 name: Test standalone PR comment
 on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -13,6 +15,7 @@ permissions:
   pull-requests: write
 jobs:
   comment:
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.labels.*.name, 'test-pr-comment'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -22,21 +25,21 @@ jobs:
         uses: ./
         with:
           coordinates-file: coordinates.json
-          renderer-url: ${{ inputs.renderer_url }}
-          pr-number: ${{ inputs.pr_number }}
+          renderer-url: ${{ inputs.renderer_url || 'https://tiles.collisionlab.world/previews/v1/render' }}
+          pr-number: ${{ inputs.pr_number || github.event.pull_request.number }}
           comment: "true"
       - name: Update the same comment using inline precedence
         uses: ./
         with:
           coordinates: '[{"coordinate":"3222/3218/0","label":"Updated smoke"}]'
           coordinates-file: coordinates.json
-          renderer-url: ${{ inputs.renderer_url }}
-          pr-number: ${{ inputs.pr_number }}
+          renderer-url: ${{ inputs.renderer_url || 'https://tiles.collisionlab.world/previews/v1/render' }}
+          pr-number: ${{ inputs.pr_number || github.event.pull_request.number }}
           comment: "true"
       - name: Verify one updated comment
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number }}
         run: |
           gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate --slurp |
             jq -e '[.[][] | select(.body | contains("<!-- osrs-coordinate-preview -->"))] |
