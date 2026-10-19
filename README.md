@@ -97,7 +97,7 @@ Only `dist/index.js` and its module package metadata are published runtime
 artefacts; consumers do not install npm dependencies. The Nix flake pins Node and
 uses the same nixpkgs revision as the renderer and infrastructure repositories.
 
-Release order: merge/test this client; tag `v1.5.0-rc.1`; run the external consumer
+Release order: review/test this client; tag a candidate `v1.5.0-rc.1`; run the external consumer
 workflow in `collisionlab/osrs-tiles` with repository
 `collisionlab/osrs-coord-preview-action` and that revision; verify the live public
 API and PR comment create/update; then publish a stable tag and deliberately move
