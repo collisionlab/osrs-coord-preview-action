@@ -1,0 +1,29 @@
+name: live
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '19 9 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  live:
+    # Enabled after infra's public-route acceptance gate passes.
+    if: vars.PREVIEW_PUBLIC_LIVE == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
+      - id: first
+        uses: ./
+        with:
+          coordinates: '[{"coordinate":"3232/3232/0"},{"coordinate":"3232/3232/1"}]'
+          output-dir: first
+      - id: second
+        uses: ./
+        with:
+          coordinates: '[{"coordinate":"3232/3232/0"},{"coordinate":"3232/3232/1"}]'
+          output-dir: second
+      - name: Verify PNG delivery and repeated identity
+        run: nix develop -c python3 scripts/check-live first/manifest.json second/manifest.json
