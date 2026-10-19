@@ -2,7 +2,7 @@
   "name": "osrs-coordinate-preview-action",
   "version": "0.1.0",
   "private": true,
-  "description": "GitHub Action client for osrs-coordinate-preview.",
+  "description": "GitHub Action client for CollisionLab OSRS coordinate previews.",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -10,12 +10,11 @@
   "scripts": {
     "build": "npm run build:ts && npm run build:bundle",
     "build:ts": "tsc -p tsconfig.json",
-    "build:bundle": "ncc build dist/src/main.js -o dist",
-    "test": "node --test --import tsx test/*.test.ts"
+    "build:bundle": "ncc build .build/main.js -o dist",
+    "test": "npm run build && node --test --import tsx test/*.test.ts"
   },
   "dependencies": {
-    "@actions/core": "^1.11.1",
-    "@actions/github": "^6.0.1"
+    "@actions/core": "^1.11.1"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

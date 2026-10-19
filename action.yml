@@ -1,6 +1,6 @@
 name: OSRS Coordinate Preview
 description: Render OSRS coordinate previews in CI and optionally comment on pull requests.
-author: mpickering
+author: CollisionLab
 branding:
   icon: map
   color: blue
@@ -21,7 +21,7 @@ inputs:
   renderer-url:
     description: Full URL of the remote render endpoint.
     required: false
-    default: https://osrs-coordinate-preview-nt7ywvsdgq-nw.a.run.app/render
+    default: https://tiles.collisionlab.world/previews/v1/render
   github-token:
     description: GitHub token used for optional pull request commenting. Defaults to github.token when omitted.
     required: false

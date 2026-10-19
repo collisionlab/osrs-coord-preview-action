@@ -1,6 +1,6 @@
 # OSRS Coordinate Preview Action
 
-This folder contains the standalone GitHub Action client for `osrs-coordinate-preview`.
+This repository contains the standalone GitHub Action client for the [CollisionLab coordinate renderer](https://github.com/collisionlab/osrs-coord-preview).
 
 ## What it does
 
@@ -19,7 +19,7 @@ It does not render locally. Local rendering remains in the main repo CLI and ser
 | --- | --- | --- | --- |
 | `coordinates` | `string` | Conditionally | JSON array of coordinate items. Takes precedence over `coordinates-file` when both are set. |
 | `coordinates-file` | `string` | Conditionally | Relative or absolute path to a file containing the JSON array payload. |
-| `renderer-url` | `string` | No | Full `POST /render` endpoint. Defaults to the public hosted service for this project. |
+| `renderer-url` | `string` | No | Full `POST /render` endpoint. Defaults to `https://tiles.collisionlab.world/previews/v1/render`. |
 | `comment` | `boolean` | No | Enable PR comment creation/update. Default `false`. |
 | `pr-number` | `string` | No | Pull request number to comment on. Useful outside direct PR-triggered workflows. |
 | `github-token` | `string` | No | Token passed to the comment action when `comment` is `true`. Defaults to `${{ github.token }}`. |
@@ -40,7 +40,7 @@ Provide either `coordinates` or `coordinates-file`.
 ## Example
 
 ```yaml
-- uses: mpickering/osrs-coordinate-preview-action@v1
+- uses: collisionlab/osrs-coord-preview-action@v1.5.0-rc.1
   with:
     coordinates: ${{ steps.coords.outputs.coordinates }}
     comment: "true"
@@ -48,7 +48,7 @@ Provide either `coordinates` or `coordinates-file`.
 ```
 
 ```yaml
-- uses: mpickering/osrs-coordinate-preview-action@v1
+- uses: collisionlab/osrs-coord-preview-action@v1.5.0-rc.1
   with:
     coordinates-file: .github/osrs/coordinates.json
     comment: "true"
@@ -58,7 +58,7 @@ Provide either `coordinates` or `coordinates-file`.
 
 ```yaml
 - id: previews
-  uses: mpickering/osrs-coordinate-preview-action@v1
+  uses: collisionlab/osrs-coord-preview-action@v1.5.0-rc.1
   with:
     coordinates-file: .github/osrs/coordinates.json
 
@@ -71,9 +71,43 @@ Provide either `coordinates` or `coordinates-file`.
 ## Development
 
 ```bash
-npm install
+nix develop
+npm ci
 npm test
-npm run build
 ```
 
 `npm run build` compiles the TypeScript sources and bundles the published action entrypoint into `dist/index.js`.
+
+## Migration and releases
+
+The original repository, Git history and tags are preserved. Existing `mpickering`
+revisions continue to call the old renderer. This migration keeps all inputs and
+outputs, the `osrs-coordinate-preview` comment tag and the HTML marker unchanged.
+The `pr-number` and default GitHub token handling remain in the existing composite
+comment action. No R2 or Google credentials are needed by this client.
+
+The CollisionLab API is undergoing staged deployment. The new release is a
+prerelease; use the `renderer-url` override with the existing endpoint during
+acceptance testing. Do not update established consumers or move `v1` until the
+public API and real PR comment create/update checks pass.
+
+`npm test` builds the committed, self-contained `dist/index.js` bundle and runs
+unit and isolated bundle/HTTP tests. CI checks the rebuilt bundle is unchanged.
+Only `dist/index.js` and its module package metadata are published runtime
+artefacts; consumers do not install npm dependencies. The Nix flake pins Node and
+uses the same nixpkgs revision as the renderer and infrastructure repositories.
+
+Release order: review/test this client; tag a candidate `v1.5.0-rc.1`; run the external consumer
+workflow in `collisionlab/osrs-tiles` with repository
+`collisionlab/osrs-coord-preview-action` and that revision; verify the live public
+API and PR comment create/update; then publish a stable tag and deliberately move
+`v1`. Roll back consumers to their previous immutable revision if necessary. Do
+not delete old releases, the old renderer or historical image storage.
+
+Repository settings are managed by `collisionlab/infra` OpenTofu. This client
+requires no new compute, storage, deployment secrets or infrastructure service.
+
+The manual `Test standalone PR comment` workflow calls the packaged composite
+Action twice on a specified PR and checks that exactly one comment remains with
+the updated label. It exercises file input, inline precedence, `pr-number` and the
+default GitHub token. Run it against an approved renderer before stable release.
