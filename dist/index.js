@@ -3560,6 +3560,8 @@ const external_node_path_namespaceObject = __WEBPACK_EXTERNAL_createRequire(impo
 const COMMENT_MARKER = "<!-- osrs-coordinate-preview -->";
 const COMMENT_IMAGE_WIDTH = 220;
 const COMMENT_IMAGE_HEIGHT = 220;
+// GitHub rejects comment bodies over 65536 characters.
+const MAX_COMMENT_CHARS = 60000;
 const PROJECT_REPO_URL = "https://github.com/collisionlab/osrs-coord-preview-action";
 function buildCommentBody(manifest) {
     return [COMMENT_MARKER, buildSummaryBody(manifest)].join("\n");
@@ -3573,13 +3575,24 @@ function buildSummaryBody(manifest) {
         "| Preview | Item | Coordinate | Source |",
         "| --- | --- | --- | --- |"
     ];
-    for (const item of manifest.items) {
+    let length = lines.join("\n").length;
+    let omitted = manifest.omittedCount ?? 0;
+    for (const [index, item] of manifest.items.entries()) {
         const title = item.label ?? item.id;
         const source = item.source ?? "";
         const preview = item.status === "success" && item.imageUrl
             ? `<a href="${item.imageUrl}"><img src="${item.imageUrl}" alt="${escapeAttribute(title)}" width="${COMMENT_IMAGE_WIDTH}" height="${COMMENT_IMAGE_HEIGHT}" /></a>`
             : escapeCell(item.status === "failure" ? `failed: ${item.error}` : "");
-        lines.push(`| ${preview} | ${escapeCell(title)} | ${escapeCell(item.coordinate)} | ${escapeCell(source)} |`);
+        const row = `| ${preview} | ${escapeCell(title)} | ${escapeCell(item.coordinate)} | ${escapeCell(source)} |`;
+        if (length + row.length + 1 > MAX_COMMENT_CHARS) {
+            omitted += manifest.items.length - index;
+            break;
+        }
+        lines.push(row);
+        length += row.length + 1;
+    }
+    if (omitted > 0) {
+        lines.push("", `…and ${pluralize(omitted, "more coordinate")} not shown.`);
     }
     return lines.join("\n");
 }
@@ -3648,11 +3661,18 @@ function validateCoordinatesPayload(raw) {
 
 
 
+// Must not exceed the renderer's per-request limits (osrs-coord-preview src/config.ts).
+const MAX_BATCH_ITEMS = 50;
+const MAX_BATCH_BYTES = 65536;
+const DEFAULT_MAX_PREVIEWS = 50;
 async function runAction(options) {
     validateCoordinatesPayload(options.coordinatesRaw);
     const outputDir = external_node_path_namespaceObject.resolve(process.cwd(), options.outputDir);
     await promises_namespaceObject.mkdir(outputDir, { recursive: true });
-    const manifest = await requestRemoteRender(options.rendererUrl, options.coordinatesRaw);
+    const items = JSON.parse(options.coordinatesRaw);
+    const shown = items.slice(0, options.maxPreviews ?? DEFAULT_MAX_PREVIEWS);
+    const manifest = await requestRemoteRender(options.rendererUrl, shown);
+    manifest.omittedCount = items.length - shown.length;
     const manifestPath = external_node_path_namespaceObject.join(outputDir, "manifest.json");
     await promises_namespaceObject.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
     const commentBodyPath = external_node_path_namespaceObject.join(outputDir, "comment.md");
@@ -3664,32 +3684,64 @@ async function runAction(options) {
     core.setOutput("summary_path", summaryPath);
     core.setOutput("render_count", String(manifest.renderCount));
     core.setOutput("failed_count", String(manifest.failedCount));
+    core.setOutput("omitted_count", String(manifest.omittedCount));
     core.summary.addHeading("OSRS coordinate previews");
-    core.summary.addRaw(`Rendered ${manifest.renderCount} preview(s); ${manifest.failedCount} failure(s).`);
+    core.summary.addRaw(`Rendered ${manifest.renderCount} preview(s); ${manifest.failedCount} failure(s); ${manifest.omittedCount} omitted.`);
     await core.summary.write();
     if (manifest.failedCount > 0) {
         core.warning(`Failed to render ${manifest.failedCount} coordinate ${manifest.failedCount === 1 ? "preview" : "previews"}. See manifest and PR comment for details.`);
     }
 }
-async function requestRemoteRender(rendererUrl, coordinatesRaw) {
+function splitBatches(items) {
+    const batches = [];
+    let batch = [];
+    let bytes = 2;
+    for (const item of items) {
+        const size = Buffer.byteLength(JSON.stringify(item)) + 1;
+        if (batch.length > 0 && (batch.length >= MAX_BATCH_ITEMS || bytes + size > MAX_BATCH_BYTES)) {
+            batches.push(batch);
+            batch = [];
+            bytes = 2;
+        }
+        batch.push(item);
+        bytes += size;
+    }
+    if (batch.length > 0)
+        batches.push(batch);
+    return batches;
+}
+async function requestRemoteRender(rendererUrl, items) {
+    const results = [];
+    for (const batch of splitBatches(items))
+        results.push(...(await requestBatch(rendererUrl, batch)).items);
+    return {
+        tileBaseUrl: "remote-renderer",
+        generatedAt: new Date().toISOString(),
+        renderCount: results.filter(item => item.status === "success").length,
+        failedCount: results.filter(item => item.status === "failure").length,
+        omittedCount: 0,
+        items: results
+    };
+}
+async function requestBatch(rendererUrl, batch, attempt = 1) {
     const response = await fetch(rendererUrl, {
         method: "POST",
         headers: {
             "content-type": "application/json"
         },
-        body: coordinatesRaw
+        body: JSON.stringify(batch)
     });
-    if (!response.ok) {
-        throw new Error(`Renderer request failed: ${response.status} ${response.statusText}`);
+    if (response.status === 429 && attempt < 3) {
+        const seconds = Math.min(Number(response.headers.get("retry-after")) || 10, 60);
+        core.info(`Renderer is rate limiting; retrying in ${seconds}s.`);
+        await new Promise(resolve => setTimeout(resolve, seconds * 1000));
+        return requestBatch(rendererUrl, batch, attempt + 1);
     }
-    const data = await response.json();
-    return {
-        tileBaseUrl: "remote-renderer",
-        generatedAt: new Date().toISOString(),
-        renderCount: data.renderCount,
-        failedCount: data.failedCount,
-        items: data.items
-    };
+    if (!response.ok) {
+        const detail = await response.json().then(body => body.error, () => undefined);
+        throw new Error(`Renderer request failed: ${response.status} ${response.statusText}${detail ? `: ${detail}` : ""}`);
+    }
+    return await response.json();
 }
 //# sourceMappingURL=action.js.map
 ;// CONCATENATED MODULE: ./.build/main.js
@@ -3698,6 +3750,14 @@ async function requestRemoteRender(rendererUrl, coordinatesRaw) {
 
 function getActionInput(name, envName) {
     return core.getInput(name) || process.env[envName] || "";
+}
+function parseMaxPreviews(raw) {
+    if (!raw)
+        return undefined;
+    const value = Number(raw);
+    if (!Number.isInteger(value) || value < 1)
+        throw new Error("max-previews must be a positive integer.");
+    return value;
 }
 async function main() {
     try {
@@ -3708,7 +3768,8 @@ async function main() {
         await runAction({
             coordinatesRaw,
             rendererUrl: getActionInput("renderer-url", "OSRS_RENDERER_URL") || "https://tiles.collisionlab.world/previews/v1/render",
-            outputDir: getActionInput("output-dir", "OSRS_OUTPUT_DIR") || ".osrs-coordinate-preview"
+            outputDir: getActionInput("output-dir", "OSRS_OUTPUT_DIR") || ".osrs-coordinate-preview",
+            maxPreviews: parseMaxPreviews(getActionInput("max-previews", "OSRS_MAX_PREVIEWS"))
         });
     }
     catch (error) {

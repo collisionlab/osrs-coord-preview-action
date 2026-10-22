@@ -11,6 +11,10 @@ inputs:
   coordinates-file:
     description: Path to a file containing the JSON array payload for coordinates.
     required: false
+  max-previews:
+    description: Maximum number of coordinates to render; the rest are counted as omitted in the comment.
+    required: false
+    default: "50"
   comment:
     description: Post or update a pull request comment summarizing the rendered previews.
     required: false
@@ -45,6 +49,9 @@ outputs:
   failed_count:
     description: Number of failed preview renders.
     value: ${{ steps.render.outputs.failed_count }}
+  omitted_count:
+    description: Number of coordinates not rendered because of max-previews.
+    value: ${{ steps.render.outputs.omitted_count }}
 runs:
   using: composite
   steps:
@@ -61,6 +68,7 @@ runs:
         OSRS_COORDINATES_FILE: ${{ inputs.coordinates-file }}
         OSRS_RENDERER_URL: ${{ inputs.renderer-url }}
         OSRS_OUTPUT_DIR: ${{ inputs.output-dir }}
+        OSRS_MAX_PREVIEWS: ${{ inputs.max-previews }}
     - if: ${{ inputs.comment == 'true' }}
       uses: thollander/actions-comment-pull-request@v3
       with:
