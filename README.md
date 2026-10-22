@@ -7,7 +7,7 @@ This is the canonical published GitHub Action client for the [CollisionLab coord
 The action:
 
 - accepts a batch JSON payload of OSRS coordinates
-- sends that payload to a hosted renderer service
+- sends that payload to a hosted renderer service, split into requests of at most 50 items / 64 KiB
 - writes local `manifest.json`, `comment.md`, and `summary.md` files
 - optionally posts or updates a PR comment using `thollander/actions-comment-pull-request@v3`
 
@@ -20,6 +20,7 @@ It does not render locally. Local rendering remains in the main repo CLI and ser
 | `coordinates` | `string` | Conditionally | JSON array of coordinate items. Takes precedence over `coordinates-file` when both are set. |
 | `coordinates-file` | `string` | Conditionally | Relative or absolute path to a file containing the JSON array payload. |
 | `renderer-url` | `string` | No | Full `POST /render` endpoint. Defaults to `https://tiles.collisionlab.world/previews/v1/render`. |
+| `max-previews` | `number` | No | Maximum coordinates to render; the rest are counted as omitted in the comment. Default `50`. |
 | `comment` | `boolean` | No | Enable PR comment creation/update. Default `false`. |
 | `pr-number` | `string` | No | Pull request number to comment on. Useful outside direct PR-triggered workflows. |
 | `github-token` | `string` | No | Token passed to the comment action when `comment` is `true`. Defaults to `${{ github.token }}`. |
@@ -36,11 +37,12 @@ Provide either `coordinates` or `coordinates-file`.
 | `summary_path` | Path to the generated `summary.md` file that can be reused or uploaded as an artifact. |
 | `render_count` | Number of successful renders returned by the renderer. |
 | `failed_count` | Number of failed renders returned by the renderer. |
+| `omitted_count` | Number of coordinates not rendered because of `max-previews`. |
 
 ## Example
 
 ```yaml
-- uses: collisionlab/osrs-coord-preview-action@v1.5.0-rc.1
+- uses: collisionlab/osrs-coord-preview-action@v1.5.1
   with:
     coordinates: ${{ steps.coords.outputs.coordinates }}
     comment: "true"
@@ -48,7 +50,7 @@ Provide either `coordinates` or `coordinates-file`.
 ```
 
 ```yaml
-- uses: collisionlab/osrs-coord-preview-action@v1.5.0-rc.1
+- uses: collisionlab/osrs-coord-preview-action@v1.5.1
   with:
     coordinates-file: .github/osrs/coordinates.json
     comment: "true"
@@ -58,7 +60,7 @@ Provide either `coordinates` or `coordinates-file`.
 
 ```yaml
 - id: previews
-  uses: collisionlab/osrs-coord-preview-action@v1.5.0-rc.1
+  uses: collisionlab/osrs-coord-preview-action@v1.5.1
   with:
     coordinates-file: .github/osrs/coordinates.json
 

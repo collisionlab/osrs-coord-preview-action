@@ -9,6 +9,7 @@ test("buildCommentBody includes image urls", () => {
     generatedAt: new Date().toISOString(),
     renderCount: 1,
     failedCount: 0,
+    omittedCount: 0,
     items: [
       {
         status: "success",
@@ -40,6 +41,7 @@ test("buildSummaryBody omits the comment marker", () => {
     generatedAt: new Date().toISOString(),
     renderCount: 0,
     failedCount: 1,
+    omittedCount: 0,
     items: [
       {
         status: "failure",
@@ -53,4 +55,24 @@ test("buildSummaryBody omits the comment marker", () => {
   const body = buildSummaryBody(manifest);
   assert.doesNotMatch(body, /<!-- osrs-coordinate-preview -->/);
   assert.match(body, /failed: bad tile/);
+});
+
+test("buildSummaryBody stays under GitHub's comment limit and counts omitted rows", () => {
+  const items = Array.from({ length: 400 }, (_, index) => ({
+    status: "success" as const,
+    id: `item-${index}`,
+    label: "x".repeat(200),
+    coordinate: "3200/3200/0",
+    resolved: { tileX: 12, tileY: 12, pixelX: 128, pixelY: 127 },
+    imageUrl: `https://tiles.collisionlab.world/previews/images/${"a".repeat(64)}.png`
+  }));
+  const manifest: RenderManifest = {
+    tileBaseUrl: "remote-renderer", generatedAt: new Date().toISOString(),
+    renderCount: items.length, failedCount: 0, omittedCount: 5, items
+  };
+  const body = buildCommentBody(manifest);
+  assert.ok(body.length < 65536);
+  const shown = body.split("\n").filter(line => line.startsWith("| <a")).length;
+  assert.ok(shown > 0 && shown < 400);
+  assert.match(body, new RegExp(`…and ${400 - shown + 5} more coordinates not shown\\.`));
 });

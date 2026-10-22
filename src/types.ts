@@ -31,6 +31,7 @@ export interface RenderManifest {
   generatedAt: string;
   renderCount: number;
   failedCount: number;
+  omittedCount: number;
   items: RenderResult[];
 }
 
